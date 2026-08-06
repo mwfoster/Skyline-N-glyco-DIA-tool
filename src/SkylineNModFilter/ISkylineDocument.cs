@@ -8,6 +8,7 @@ namespace SkylineNModFilter
         IList<PeptideRecord> ReadPeptides();
         void DeletePeptides(IList<PeptideRecord> peptides);
         void RemoveEmptyContainers();
+        ReplicateOrderResult ApplyReplicateOrdering(ReplicateManifest manifest);
         void NormalizeWithSkylineCmd(int maxVariableMods, ProteinAssociationOptions options);
         void Verify(string match, int maxVariableMods);
         void PublishWorkingCopy(string destinationPath);

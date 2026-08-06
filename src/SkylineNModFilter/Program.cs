@@ -22,9 +22,9 @@ namespace SkylineNModFilter
                     if (!replace) return 0;
                 }
                 var command = string.IsNullOrWhiteSpace(options.SkylineCommand) ? FindSkylineCommand() : options.SkylineCommand;
-                var workflow = new FilterWorkflow(new SkylineDocument(command, SkylineDocument.RunProcess), File.Exists, options.AssociationOptions);
+                var workflow = new FilterWorkflow(new SkylineDocument(command, SkylineDocument.RunProcess), File.Exists, options.AssociationOptions, options.ReplicateOrderingOptions);
                 var result = workflow.Run(options.DocumentPath, replace);
-                MessageBox.Show("Filtered document created.\n\nRetained: " + result.RetainedCount + "\nRemoved: " + result.RemovedCount + "\n\n" + result.OutputPath, "N-Mod Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(CompletionMessage.Build(result), "N-Mod Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return 0;
             }
             catch (ArgumentException exception) { MessageBox.Show(exception.Message, "N-Mod Filter", MessageBoxButtons.OK, MessageBoxIcon.Warning); return 2; }

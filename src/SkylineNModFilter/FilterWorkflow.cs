@@ -9,6 +9,7 @@ namespace SkylineNModFilter
         public int RetainedCount { get; set; }
         public int RemovedCount { get; set; }
         public string OutputPath { get; set; }
+        public ReplicateOrderResult ReplicateOrderResult { get; set; }
     }
 
     internal sealed class FilterWorkflow
@@ -16,12 +17,14 @@ namespace SkylineNModFilter
         private readonly ISkylineDocument _document;
         private readonly Func<string, bool> _fileExists;
         private readonly ProteinAssociationOptions _associationOptions;
+        private readonly ReplicateOrderingOptions _replicateOrderingOptions;
 
-        public FilterWorkflow(ISkylineDocument document, Func<string, bool> fileExists, ProteinAssociationOptions associationOptions = null)
+        public FilterWorkflow(ISkylineDocument document, Func<string, bool> fileExists, ProteinAssociationOptions associationOptions = null, ReplicateOrderingOptions replicateOrderingOptions = null)
         {
             _document = document;
             _fileExists = fileExists;
             _associationOptions = associationOptions ?? ProteinAssociationOptions.Disabled;
+            _replicateOrderingOptions = replicateOrderingOptions ?? ReplicateOrderingOptions.Disabled;
         }
 
         public FilterResult Run(string sourcePath, bool replaceExisting)
@@ -38,11 +41,13 @@ namespace SkylineNModFilter
                 var plan = FilterPlan.Create(_document.ReadPeptides());
                 _document.DeletePeptides(plan.DeleteElements);
                 _document.RemoveEmptyContainers();
+                ReplicateOrderResult replicateResult = null;
+                if (_replicateOrderingOptions.Enabled) replicateResult = _document.ApplyReplicateOrdering(ReplicateManifest.Load(_replicateOrderingOptions));
                 _document.NormalizeWithSkylineCmd(1, _associationOptions);
                 _document.Verify("N[", 1);
                 _document.PublishWorkingCopy(destination);
                 published = true;
-                return new FilterResult { OutputPath = destination, RetainedCount = plan.RetainedCount, RemovedCount = plan.RemovedCount };
+                return new FilterResult { OutputPath = destination, RetainedCount = plan.RetainedCount, RemovedCount = plan.RemovedCount, ReplicateOrderResult = replicateResult };
             }
             finally
             {

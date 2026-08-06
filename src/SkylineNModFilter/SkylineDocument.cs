@@ -61,6 +61,71 @@ namespace SkylineNModFilter
             foreach (var group in _xml.Descendants().Where(e => e.Name.LocalName == "protein_group" && !e.Elements().Any(c => c.Name.LocalName == "peptide")).ToList()) group.Remove();
         }
 
+        public ReplicateOrderResult ApplyReplicateOrdering(ReplicateManifest manifest)
+        {
+            if (manifest == null) throw new ArgumentNullException("manifest");
+            var measuredResults = _xml.Descendants().FirstOrDefault(e => e.Name.LocalName == "measured_results");
+            if (measuredResults == null) throw new InvalidDataException("The Skyline document has no measured results to reorder.");
+            var replicates = measuredResults.Elements().Where(e => e.Name.LocalName == "replicate").ToList();
+            if (replicates.Count == 0) throw new InvalidDataException("The Skyline document has no results replicates to reorder.");
+
+            var byName = new Dictionary<string, XElement>(StringComparer.OrdinalIgnoreCase);
+            foreach (var replicate in replicates)
+            {
+                var name = (string)replicate.Attribute("name");
+                if (string.IsNullOrWhiteSpace(name) || byName.ContainsKey(name)) throw new InvalidDataException("Skyline replicate names must be nonblank and unique before ordering.");
+                byName.Add(name, replicate);
+            }
+
+            var matchedElements = new List<XElement>();
+            var entryByElement = new Dictionary<XElement, ReplicateManifestEntry>();
+            var absentManifest = 0;
+            foreach (var entry in manifest.Entries)
+            {
+                XElement replicate;
+                if (!byName.TryGetValue(entry.Key, out replicate)) { absentManifest++; continue; }
+                matchedElements.Add(replicate);
+                entryByElement.Add(replicate, entry);
+            }
+            if (matchedElements.Count == 0) throw new InvalidDataException("No Skyline replicate names matched the selected metadata file.");
+
+            var finalNames = new Dictionary<XElement, string>();
+            var originalNames = replicates.ToDictionary(e => e, e => (string)e.Attribute("name"));
+            var uniqueFinalNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var replicate in replicates)
+            {
+                var original = (string)replicate.Attribute("name");
+                ReplicateManifestEntry entry;
+                var finalName = entryByElement.TryGetValue(replicate, out entry) && !string.IsNullOrWhiteSpace(entry.ProposedName) ? entry.ProposedName : original;
+                if (string.IsNullOrWhiteSpace(finalName) || !uniqueFinalNames.Add(finalName)) throw new InvalidDataException("Replicate renaming would create a duplicate or blank final name: " + finalName);
+                finalNames.Add(replicate, finalName);
+            }
+
+            var renameMap = replicates.ToDictionary(e => (string)e.Attribute("name"), e => finalNames[e], StringComparer.OrdinalIgnoreCase);
+            foreach (var replicate in replicates) replicate.SetAttributeValue("name", finalNames[replicate]);
+            foreach (var attribute in _xml.Descendants().Attributes().Where(a => a.Name.LocalName == "replicate").ToList())
+            {
+                string replacement;
+                if (renameMap.TryGetValue(attribute.Value, out replacement)) attribute.Value = replacement;
+            }
+
+            var matchedSet = new HashSet<XElement>(matchedElements);
+            var reordered = matchedElements.Concat(replicates.Where(e => !matchedSet.Contains(e))).ToList();
+            foreach (var replicate in replicates) replicate.Remove();
+            measuredResults.Add(reordered);
+
+            var renamed = entryByElement.Keys.Count(e => !string.Equals(originalNames[e], finalNames[e], StringComparison.Ordinal));
+            return new ReplicateOrderResult
+            {
+                Matched = matchedElements.Count,
+                IgnoredManifest = manifest.IgnoredRowCount + absentManifest,
+                UnmatchedSkyline = replicates.Count - matchedElements.Count,
+                DuplicateManifest = manifest.DuplicateCount,
+                Renamed = renamed,
+                Unchanged = matchedElements.Count - renamed
+            };
+        }
+
         internal void SaveXmlForTest() { _xml.Save(_workingPath); }
 
         public void NormalizeWithSkylineCmd(int maxVariableMods, ProteinAssociationOptions options)
