@@ -12,6 +12,20 @@ namespace SkylineNModFilter.Tests
             RunsOperationsInSafeOrder();
             CancelsBeforeMutationWhenOutputExists();
             DiscardsWorkingCopyAfterFailure();
+            ReordersBeforeNormalizationWhenEnabled();
+        }
+
+        private static void ReordersBeforeNormalizationWhenEnabled()
+        {
+            var path = Path.Combine(Path.GetTempPath(), "workflow-" + Guid.NewGuid().ToString("N") + ".fp-manifest");
+            File.WriteAllText(path, "A.raw\t\t\tDIA-Quant\r\n");
+            var fake = new RecordingDocument();
+            fake.OrderResult = new ReplicateOrderResult { Matched = 1, Renamed = 1 };
+            var workflow = new FilterWorkflow(fake, delegate { return false; }, ProteinAssociationOptions.Disabled, ReplicateOrderingOptions.EnabledFor(path, false, false, 0));
+            var result = workflow.Run(Path.Combine(Path.GetTempPath(), "ordered.sky"), false);
+            TestAssert.Equal("create,read,delete,empty,reorder,normalize:1,verify,publish", string.Join(",", fake.Calls), "Ordering must occur before Skyline normalization.");
+            TestAssert.Equal(1, result.ReplicateOrderResult.Matched, "Workflow must return ordering statistics.");
+            File.Delete(path);
         }
 
         private static void RunsOperationsInSafeOrder()
@@ -47,6 +61,7 @@ namespace SkylineNModFilter.Tests
         {
             public readonly List<string> Calls = new List<string>();
             public bool FailAtNormalize;
+            public ReplicateOrderResult OrderResult = new ReplicateOrderResult();
 
             public void CreateWorkingCopy(string sourcePath, string destinationPath) { Calls.Add("create"); }
             public IList<PeptideRecord> ReadPeptides()
@@ -60,6 +75,7 @@ namespace SkylineNModFilter.Tests
             }
             public void DeletePeptides(IList<PeptideRecord> peptides) { Calls.Add("delete"); }
             public void RemoveEmptyContainers() { Calls.Add("empty"); }
+            public ReplicateOrderResult ApplyReplicateOrdering(ReplicateManifest manifest) { Calls.Add("reorder"); return OrderResult; }
             public void NormalizeWithSkylineCmd(int maxVariableMods, ProteinAssociationOptions options) { Calls.Add("normalize:" + maxVariableMods); if (FailAtNormalize) throw new InvalidOperationException("normalize"); }
             public void Verify(string match, int maxVariableMods) { Calls.Add("verify"); }
             public void PublishWorkingCopy(string destinationPath) { Calls.Add("publish"); }
