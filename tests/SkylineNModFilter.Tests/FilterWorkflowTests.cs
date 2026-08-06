@@ -13,6 +13,27 @@ namespace SkylineNModFilter.Tests
             CancelsBeforeMutationWhenOutputExists();
             DiscardsWorkingCopyAfterFailure();
             ReordersBeforeNormalizationWhenEnabled();
+            FiltersMissingPrecursorsBeforeEmptyCleanup();
+            MissingnessOnlySkipsSequenceFiltering();
+        }
+
+        private static void MissingnessOnlySkipsSequenceFiltering()
+        {
+            var fake = new RecordingDocument();
+            var workflow = new FilterWorkflow(fake, delegate { return false; }, ProteinAssociationOptions.Disabled, ReplicateOrderingOptions.Disabled, PrecursorMissingnessOptions.EnabledFor(50), true);
+            var result = workflow.Run(Path.Combine(Path.GetTempPath(), "baseline.sky"), false);
+            TestAssert.Equal("create,missingness,empty,normalize:1,verify-settings,publish", string.Join(",", fake.Calls), "Missingness-only mode must skip sequence reading, deletion, and N-sequence verification.");
+            TestAssert.True(result.OutputPath.EndsWith("baseline_missingness-filtered.sky", StringComparison.OrdinalIgnoreCase), "Missingness-only output suffix is required.");
+        }
+
+        private static void FiltersMissingPrecursorsBeforeEmptyCleanup()
+        {
+            var fake = new RecordingDocument();
+            fake.MissingnessResult = new PrecursorMissingnessResult { Evaluated = 5, Retained = 3, Removed = 2, MaximumMissingPercent = 50 };
+            var workflow = new FilterWorkflow(fake, delegate { return false; }, ProteinAssociationOptions.Disabled, ReplicateOrderingOptions.Disabled, PrecursorMissingnessOptions.EnabledFor(50));
+            var result = workflow.Run(Path.Combine(Path.GetTempPath(), "missing.sky"), false);
+            TestAssert.Equal("create,read,delete,missingness,empty,normalize:1,verify,publish", string.Join(",", fake.Calls), "Missing precursors must be removed before empty peptide and protein cleanup.");
+            TestAssert.Equal(2, result.PrecursorMissingnessResult.Removed, "Workflow must return missingness statistics.");
         }
 
         private static void ReordersBeforeNormalizationWhenEnabled()
@@ -62,6 +83,7 @@ namespace SkylineNModFilter.Tests
             public readonly List<string> Calls = new List<string>();
             public bool FailAtNormalize;
             public ReplicateOrderResult OrderResult = new ReplicateOrderResult();
+            public PrecursorMissingnessResult MissingnessResult = new PrecursorMissingnessResult();
 
             public void CreateWorkingCopy(string sourcePath, string destinationPath) { Calls.Add("create"); }
             public IList<PeptideRecord> ReadPeptides()
@@ -74,10 +96,12 @@ namespace SkylineNModFilter.Tests
                 };
             }
             public void DeletePeptides(IList<PeptideRecord> peptides) { Calls.Add("delete"); }
+            public PrecursorMissingnessResult ApplyPrecursorMissingnessFilter(PrecursorMissingnessOptions options) { Calls.Add("missingness"); return MissingnessResult; }
             public void RemoveEmptyContainers() { Calls.Add("empty"); }
             public ReplicateOrderResult ApplyReplicateOrdering(ReplicateManifest manifest) { Calls.Add("reorder"); return OrderResult; }
             public void NormalizeWithSkylineCmd(int maxVariableMods, ProteinAssociationOptions options) { Calls.Add("normalize:" + maxVariableMods); if (FailAtNormalize) throw new InvalidOperationException("normalize"); }
             public void Verify(string match, int maxVariableMods) { Calls.Add("verify"); }
+            public void VerifySettings(int maxVariableMods) { Calls.Add("verify-settings"); }
             public void PublishWorkingCopy(string destinationPath) { Calls.Add("publish"); }
             public void DiscardWorkingCopy() { Calls.Add("discard"); }
         }

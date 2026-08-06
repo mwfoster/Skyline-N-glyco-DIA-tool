@@ -6,7 +6,8 @@ namespace SkylineNModFilter
     {
         public static string Build(FilterResult result)
         {
-            var text = new StringBuilder("Filtered document created.\n\nRetained: ").Append(result.RetainedCount).Append("\nRemoved: ").Append(result.RemovedCount);
+            var text = new StringBuilder("Filtered document created.");
+            if (result.SequenceFilterApplied) text.Append("\n\nPeptides retained: ").Append(result.RetainedCount).Append("\nPeptides removed: ").Append(result.RemovedCount);
             var order = result.ReplicateOrderResult;
             if (order != null)
             {
@@ -16,6 +17,20 @@ namespace SkylineNModFilter
                     .Append("\nDuplicate manifest keys: ").Append(order.DuplicateManifest)
                     .Append("\nRenamed replicates: ").Append(order.Renamed)
                     .Append("\nUnchanged matched replicates: ").Append(order.Unchanged);
+            }
+            var missingness = result.PrecursorMissingnessResult;
+            if (missingness != null)
+            {
+                text.Append("\n\nPrecursors evaluated: ").Append(missingness.Evaluated)
+                    .Append("\nPrecursors retained: ").Append(missingness.Retained)
+                    .Append("\nPrecursors removed: ").Append(missingness.Removed)
+                    .Append("\nMaximum missing data: ").Append(missingness.MaximumMissingPercent).Append('%')
+                    .Append("\nMissingness scope: ").Append(missingness.Scope)
+                    .Append("\nGroups evaluated: ").Append(missingness.EvaluatedGroupCount);
+                if (missingness.Scope != "All replicates") text.Append("\nAnnotated replicates: ").Append(missingness.AnnotatedReplicates)
+                    .Append("\nUnannotated replicates: ").Append(missingness.UnannotatedReplicates)
+                    .Append("\nExcluded replicates: ").Append(missingness.ExcludedReplicates);
+                if (!string.IsNullOrWhiteSpace(missingness.SelectedGroup)) text.Append("\nSelected group: ").Append(missingness.SelectedGroup);
             }
             return text.Append("\n\n").Append(result.OutputPath).ToString();
         }

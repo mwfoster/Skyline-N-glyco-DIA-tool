@@ -12,7 +12,7 @@ Skyline N-Mod Filter is a Windows External Tool for Skyline-daily. It creates a 
 
 ## Installation
 
-1. Download `SkylineNModFilter-1.3.0.zip` from the repository's `releases` folder.
+1. Download `SkylineNModFilter-1.5.0.zip` from the repository's `releases` folder.
 2. Completely close Skyline-daily.
 3. Reopen Skyline-daily and choose **Tools > External Tools**.
 4. Remove an older **N-Mod Filter** entry if present.
@@ -30,6 +30,8 @@ Skyline N-Mod Filter is a Windows External Tool for Skyline-daily. It creates a 
 - Optionally reorders results replicates from the row order of a FragPipe manifest, TSV, or CSV metadata file.
 - Optionally treats the first nonblank metadata row as a header and uses its labels for rename-column selection.
 - Optionally renames matched replicates from a selected metadata column while preserving raw-file and acquisition metadata.
+- Optionally removes precursor charge states whose precursor-level peak area is missing in more than a selected percentage of all replicates.
+- Supports missingness-only output and missingness filtering within a selected metadata group or any metadata group.
 
 The source document is not overwritten.
 
@@ -44,6 +46,30 @@ Association creates protein groups for proteins matching the same peptides and a
 Enable **Reorder replicates from metadata file** in the tool dialog and select a `.fp-manifest`, `.tsv`, or `.csv` file. Column 1 is matched case-insensitively to the original Skyline replicate name after removing directories and a terminal `.raw`. Matched replicates follow file row order; Skyline replicates absent from the file remain last in their existing order.
 
 Enable **File contains header row** when appropriate. To rename, enable **Rename matched replicates** and select a column of 2 or greater. Blank rename values keep the original name. Duplicate final names stop processing before the output is published.
+
+## Precursor peak-area missingness
+
+Enable **Filter precursors by peak-area missingness** and set **Maximum missing data (%)** from 0 through 100; the default is 50. Every results replicate in the document is included in the denominator. A precursor is present in a replicate only when its Skyline `<precursor_peak>` has a finite numeric `area` greater than zero. Missing results, blank or invalid areas, zero, and negative areas count as missing.
+
+Each precursor charge state is evaluated independently. A precursor exactly at the selected limit is retained; only precursors above the limit are removed. Empty peptides, proteins, and protein groups are removed afterward.
+
+Equivalent command-line options are `--filter-precursor-missingness --max-missing-percent 50`.
+
+### Missingness-only mode
+
+Enable **Missingness-only mode** to skip the `N[` peptide-sequence filter and apply only precursor missingness filtering. Maximum variable modifications is still set to 1, and empty peptides and proteins are still removed. The output is named `<source>_missingness-filtered.sky`. Rerun from the same pre-missingness source when revising the threshold because previously removed precursors cannot be restored.
+
+### Metadata group scopes
+
+The **Missingness scope** choices are:
+
+- **All replicates**: use every document replicate as one denominator.
+- **Selected group**: use only replicates assigned to the chosen metadata group.
+- **Any group**: retain a precursor when it meets the threshold in at least one group; remove it only when it fails in every evaluated group.
+
+Selected-group and any-group modes use the same metadata file and header setting as optional replicate ordering. Column 1 matches Skyline replicate names, and **Group column** selects the metadata annotation. Group labels are case-insensitive. Blank group values and Skyline replicates absent from the metadata are assigned to **Unannotated**. Enable **Exclude unannotated replicates** to omit that group.
+
+Grouped command-line options are `--missingness-scope selected|any`, `--replicate-manifest <file>`, `--group-column <number>`, optional `--selected-group <name>`, and optional `--exclude-unannotated`. Add `--missingness-only` for missingness-only output.
 
 ## Building and testing
 
