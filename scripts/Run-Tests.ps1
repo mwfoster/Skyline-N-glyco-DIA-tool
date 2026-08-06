@@ -14,6 +14,11 @@ $productionSources = @()
 if (Test-Path -LiteralPath $productionDirectory) {
     $productionSources = Get-ChildItem -LiteralPath $productionDirectory -Filter '*.cs' | ForEach-Object { $_.FullName }
 }
+$sharedDirectory = Join-Path $projectRoot 'src\Shared'
+$sharedSources = @()
+if (Test-Path -LiteralPath $sharedDirectory) {
+    $sharedSources = Get-ChildItem -LiteralPath $sharedDirectory -Filter '*.cs' | ForEach-Object { $_.FullName }
+}
 
 $arguments = @(
     '/nologo',
@@ -22,8 +27,9 @@ $arguments = @(
     ('/out:' + (Join-Path $outputDirectory 'SkylineNModFilter.Tests.exe')),
     '/reference:System.Xml.Linq.dll'
     '/reference:System.Windows.Forms.dll'
+    '/reference:Microsoft.VisualBasic.dll'
     ('/reference:' + (Join-Path $projectRoot '..\work\SkylineRuntime\System.Data.SQLite.dll'))
-) + $productionSources + $testSources
+) + $productionSources + $sharedSources + $testSources
 
 & $compiler $arguments
 if ($LASTEXITCODE -ne 0) {

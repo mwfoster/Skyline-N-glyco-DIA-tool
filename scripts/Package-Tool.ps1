@@ -17,7 +17,7 @@ Copy-Item -LiteralPath (Join-Path $root 'tool-inf\info.properties') -Destination
 Copy-Item -LiteralPath (Join-Path $root 'tool-inf\NModFilter.properties') -Destination (Join-Path $staging 'tool-inf')
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $staging
 Copy-Item -LiteralPath (Join-Path $root 'THIRD_PARTY_NOTICES.md') -Destination $staging
-$package = Join-Path $outputDirectory 'SkylineNModFilter-1.2.0.zip'
+$package = Join-Path $outputDirectory 'SkylineNModFilter-1.3.0.zip'
 if (Test-Path -LiteralPath $package) { Remove-Item -LiteralPath $package -Force }
 Compress-Archive -Path (Join-Path $staging '*') -DestinationPath $package -CompressionLevel Optimal
 Write-Output $package
