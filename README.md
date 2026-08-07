@@ -12,7 +12,7 @@ Skyline N-Mod Filter is a Windows External Tool for Skyline-daily. It creates a 
 
 ## Installation
 
-1. Download `SkylineNModFilter-1.5.0.zip` from the repository's `releases` folder.
+1. Download `SkylineNModFilter-1.6.0.zip` from the repository's `releases` folder.
 2. Completely close Skyline-daily.
 3. Reopen Skyline-daily and choose **Tools > External Tools**.
 4. Remove an older **N-Mod Filter** entry if present.
@@ -30,6 +30,7 @@ Skyline N-Mod Filter is a Windows External Tool for Skyline-daily. It creates a 
 - Optionally reorders results replicates from the row order of a FragPipe manifest, TSV, or CSV metadata file.
 - Optionally treats the first nonblank metadata row as a header and uses its labels for rename-column selection.
 - Optionally renames matched replicates from a selected metadata column while preserving raw-file and acquisition metadata.
+- Optionally imports every metadata column after the filename key as a Skyline replicate annotation.
 - Optionally removes precursor charge states whose precursor-level peak area is missing in more than a selected percentage of all replicates.
 - Supports missingness-only output and missingness filtering within a selected metadata group or any metadata group.
 
@@ -46,6 +47,16 @@ Association creates protein groups for proteins matching the same peptides and a
 Enable **Reorder replicates from metadata file** in the tool dialog and select a `.fp-manifest`, `.tsv`, or `.csv` file. Column 1 is matched case-insensitively to the original Skyline replicate name after removing directories and a terminal `.raw`. Matched replicates follow file row order; Skyline replicates absent from the file remain last in their existing order.
 
 Enable **File contains header row** when appropriate. To rename, enable **Rename matched replicates** and select a column of 2 or greater. Blank rename values keep the original name. Duplicate final names stop processing before the output is published.
+
+## Replicate annotations and volcano plots
+
+Enable **Import all metadata columns as replicate annotations** to make metadata available in Skyline's Document Grid and Group Comparisons. A header row is required. Column 1 is the filename key; every nonblank, uniquely named column from column 2 onward becomes a text annotation that applies to replicates. Existing annotation definitions are preserved when they already apply to replicates. An existing definition with the same name that does not apply to replicates stops processing safely.
+
+Matching is case-insensitive and removes directories and a terminal `.raw`. When ordering and renaming are enabled in the same run, annotation values are still matched from the original raw-file identity and written to the final replicate name. Skyline replicates missing from the metadata remain unannotated, and metadata rows missing from Skyline are reported. If one Skyline replicate contains multiple raw files, identical metadata values are accepted; conflicting values stop processing with an explanatory error.
+
+After opening the output document, use **Settings > Document Settings > Annotations** to confirm the imported fields. A categorical annotation such as `Condition` can then be selected in Skyline's **Group Comparisons** to create a comparison and display Skyline's built-in volcano plot; MSstats is not required for that plot.
+
+The equivalent command-line flag is `--import-replicate-annotations`, used with `--replicate-manifest <file>` and `--manifest-has-header`.
 
 ## Precursor peak-area missingness
 

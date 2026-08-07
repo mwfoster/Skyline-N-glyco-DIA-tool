@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Globalization;
 using System.Xml;
 using System.Xml.Linq;
 
@@ -54,69 +53,6 @@ namespace SkylineNModFilter
         }
 
         public void DeletePeptides(IList<PeptideRecord> peptides) { foreach (var peptide in peptides) peptide.Element.Remove(); }
-
-        public PrecursorMissingnessResult ApplyPrecursorMissingnessFilter(PrecursorMissingnessOptions options)
-        {
-            if (options == null || !options.Enabled) throw new ArgumentException("Enabled precursor missingness options are required.", "options");
-            var measuredResults = _xml.Descendants().FirstOrDefault(e => e.Name.LocalName == "measured_results");
-            var replicates = measuredResults == null ? new List<XElement>() : measuredResults.Elements().Where(e => e.Name.LocalName == "replicate").ToList();
-            if (replicates.Count == 0) throw new InvalidDataException("The Skyline document has no results replicates for precursor missingness filtering.");
-            var replicateNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var replicate in replicates)
-            {
-                var name = (string)replicate.Attribute("name");
-                if (string.IsNullOrWhiteSpace(name) || !replicateNames.Add(name)) throw new InvalidDataException("Skyline replicate names must be nonblank and unique for precursor missingness filtering.");
-            }
-
-            var groups = new List<KeyValuePair<string, HashSet<string>>>();
-            var annotated = 0; var unannotated = 0; var excluded = 0;
-            if (options.Scope == PrecursorMissingnessScope.AllReplicates)
-            {
-                groups.Add(new KeyValuePair<string, HashSet<string>>("All replicates", replicateNames));
-            }
-            else
-            {
-                var map = PrecursorGroupMap.Load(options);
-                var groupLookup = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-                var groupNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var replicate in replicateNames)
-                {
-                    string group;
-                    if (map.TryGetGroup(replicate, out group)) annotated++; else { group = "Unannotated"; unannotated++; }
-                    if (options.ExcludeUnannotated && string.Equals(group, "Unannotated", StringComparison.OrdinalIgnoreCase)) { excluded++; continue; }
-                    HashSet<string> members;
-                    if (!groupLookup.TryGetValue(group, out members)) { members = new HashSet<string>(StringComparer.OrdinalIgnoreCase); groupLookup.Add(group, members); groupNames.Add(group, group); }
-                    members.Add(replicate);
-                }
-                if (options.Scope == PrecursorMissingnessScope.SelectedGroup)
-                {
-                    HashSet<string> selected;
-                    if (!groupLookup.TryGetValue(options.SelectedGroup, out selected) || selected.Count == 0) throw new InvalidDataException("The selected metadata group has no Skyline replicates: " + options.SelectedGroup);
-                    groups.Add(new KeyValuePair<string, HashSet<string>>(groupNames[options.SelectedGroup], selected));
-                }
-                else foreach (var pair in groupLookup) if (pair.Value.Count > 0) groups.Add(new KeyValuePair<string, HashSet<string>>(groupNames[pair.Key], pair.Value));
-                if (groups.Count == 0) throw new InvalidDataException("No metadata groups remain for precursor missingness filtering.");
-            }
-
-            var precursors = _xml.Descendants().Where(e => e.Name.LocalName == "precursor").ToList();
-            var removed = 0;
-            foreach (var precursor in precursors)
-            {
-                var present = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var peak in precursor.Descendants().Where(e => e.Name.LocalName == "precursor_peak"))
-                {
-                    var replicate = (string)peak.Attribute("replicate");
-                    double area;
-                    if (replicateNames.Contains(replicate ?? string.Empty) && double.TryParse((string)peak.Attribute("area"), NumberStyles.Float, CultureInfo.InvariantCulture, out area) && !double.IsNaN(area) && !double.IsInfinity(area) && area > 0) present.Add(replicate);
-                }
-                var passes = groups.Any(group => (group.Value.Count - group.Value.Count(present.Contains)) * 100 <= options.MaximumMissingPercent * group.Value.Count);
-                if (!passes) { precursor.Remove(); removed++; }
-            }
-            return new PrecursorMissingnessResult { Evaluated = precursors.Count, Retained = precursors.Count - removed, Removed = removed, MaximumMissingPercent = options.MaximumMissingPercent,
-                Scope = options.Scope == PrecursorMissingnessScope.AllReplicates ? "All replicates" : options.Scope == PrecursorMissingnessScope.SelectedGroup ? "Selected group" : "Any group",
-                SelectedGroup = options.Scope == PrecursorMissingnessScope.SelectedGroup ? groups[0].Key : null, EvaluatedGroupCount = groups.Count,
-                AnnotatedReplicates = annotated, UnannotatedReplicates = unannotated, ExcludedReplicates = excluded };
-        }
 
         public void RemoveEmptyContainers()
         {
@@ -220,11 +156,6 @@ namespace SkylineNModFilter
         public void Verify(string match, int maxVariableMods)
         {
             if (ReadPeptides().Any(p => p.ModifiedSequence.IndexOf(match, StringComparison.Ordinal) < 0)) throw new InvalidDataException("The normalized document contains a nonmatching peptide.");
-            VerifySettings(maxVariableMods);
-        }
-
-        public void VerifySettings(int maxVariableMods)
-        {
             var setting = _xml.Descendants().Attributes("max_variable_mods").FirstOrDefault();
             if (setting == null || setting.Value != maxVariableMods.ToString()) throw new InvalidDataException("Maximum variable modifications was not applied.");
         }
