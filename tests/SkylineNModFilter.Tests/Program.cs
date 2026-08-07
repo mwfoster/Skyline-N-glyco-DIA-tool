@@ -19,6 +19,9 @@ namespace SkylineNModFilter.Tests
                 DelimitedMetadataReaderTests.Run();
                 ReplicateManifestTests.Run();
                 ReplicateOrderingTests.Run();
+                PrecursorMissingnessTests.Run();
+                ReplicateAnnotationMetadataTests.Run();
+                ReplicateAnnotationTests.Run();
                 CompletionMessageTests.Run();
                 CollectorArgumentContractTests.Run();
                 Console.WriteLine("PASS: filtering core");

@@ -44,7 +44,7 @@ namespace SkylineNModFilter
             return new ReplicateManifest(entries, duplicates, ignored);
         }
 
-        private static string NormalizeKey(string value)
+        internal static string NormalizeKey(string value)
         {
             var cleaned = Clean(value).Replace('\\', '/');
             var slash = cleaned.LastIndexOf('/');

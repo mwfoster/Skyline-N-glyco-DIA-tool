@@ -37,7 +37,7 @@ namespace SkylineNModFilter.Tests
                 return new CommandResult(0, string.Empty, string.Empty);
             }, successExporter);
             successDocument.CreateWorkingCopy(source, Path.Combine(root, "success.sky"));
-            successDocument.NormalizeWithSkylineCmd(1, ProteinAssociationOptions.EnabledFor(Path.Combine(root, "human.protdb"), "Human"));
+            successDocument.NormalizeWithSkylineCmd(1, ProteinAssociationOptions.EnabledFor(Path.Combine(root, "human.protdb"), "Human"), null);
             TestAssert.Equal(1, successExporter.CallCount, "Association must export exactly one FASTA.");
             TestAssert.True(captured.Contains("--associate-proteins-fasta=\"" + successExporter.LastPath + "\""), "Association command must quote the exported FASTA path.");
             TestAssert.True(!File.Exists(successExporter.LastPath), "Temporary FASTA must be removed after successful SkylineCmd execution.");
@@ -51,7 +51,7 @@ namespace SkylineNModFilter.Tests
                 return new CommandResult(1, string.Empty, "association failed");
             }, failureExporter);
             failureDocument.CreateWorkingCopy(source, Path.Combine(root, "failure.sky"));
-            TestAssert.Throws<InvalidOperationException>(delegate { failureDocument.NormalizeWithSkylineCmd(1, ProteinAssociationOptions.EnabledFor(Path.Combine(root, "human.protdb"), "Human")); }, "Association failure must escape.");
+            TestAssert.Throws<InvalidOperationException>(delegate { failureDocument.NormalizeWithSkylineCmd(1, ProteinAssociationOptions.EnabledFor(Path.Combine(root, "human.protdb"), "Human"), null); }, "Association failure must escape.");
             TestAssert.True(!File.Exists(failureExporter.LastPath), "Temporary FASTA must be removed after failed SkylineCmd execution.");
 
             var disabledExporter = new RecordingFastaExporter();
@@ -64,7 +64,7 @@ namespace SkylineNModFilter.Tests
                 return new CommandResult(0, string.Empty, string.Empty);
             }, disabledExporter);
             disabledDocument.CreateWorkingCopy(source, Path.Combine(root, "disabled.sky"));
-            disabledDocument.NormalizeWithSkylineCmd(1, ProteinAssociationOptions.Disabled);
+            disabledDocument.NormalizeWithSkylineCmd(1, ProteinAssociationOptions.Disabled, null);
             TestAssert.Equal(0, disabledExporter.CallCount, "Disabled association must not export a FASTA.");
             Directory.Delete(root, true);
         }
@@ -133,7 +133,7 @@ namespace SkylineNModFilter.Tests
             Directory.CreateDirectory(root);
             new XDocument(new XElement("srm_settings", new XElement("protein", new XElement("peptide", new XAttribute("modified_sequence", "AN[+1]"), new XElement("precursor"))))).Save(source);
             document.CreateWorkingCopy(source, Path.Combine(root, "work.sky"));
-            TestAssert.Throws<InvalidOperationException>(delegate { document.NormalizeWithSkylineCmd(1, ProteinAssociationOptions.EnabledFor("C:\\db\\human.protdb", "Human Proteome")); }, "Nonzero SkylineCmd exit must fail.");
+            TestAssert.Throws<InvalidOperationException>(delegate { document.NormalizeWithSkylineCmd(1, ProteinAssociationOptions.EnabledFor("C:\\db\\human.protdb", "Human Proteome"), null); }, "Nonzero SkylineCmd exit must fail.");
             TestAssert.True(captured.Contains("--pep-max-variable-mods=1"), "Command must set maximum variable mods.");
             TestAssert.True(captured.Contains("--refine-min-peptides=1"), "Command must remove empty proteins.");
             TestAssert.True(captured.Contains("--background-proteome-file=\"C:\\db\\human.protdb\""), "Selected background proteome path must be quoted.");
@@ -147,7 +147,7 @@ namespace SkylineNModFilter.Tests
             Directory.CreateDirectory(root);
             new XDocument(new XElement("srm_settings")).Save(source);
             diagnosticDocument.CreateWorkingCopy(source, Path.Combine(root, "diagnostic.sky"));
-            var exception = TestAssert.Throws<InvalidOperationException>(delegate { diagnosticDocument.NormalizeWithSkylineCmd(1, ProteinAssociationOptions.Disabled); }, "Failure should report command output.");
+            var exception = TestAssert.Throws<InvalidOperationException>(delegate { diagnosticDocument.NormalizeWithSkylineCmd(1, ProteinAssociationOptions.Disabled, null); }, "Failure should report command output.");
             TestAssert.True(exception.Message.Contains("useful stdout"), "SkylineCmd stdout must be included in diagnostics.");
             Directory.Delete(root, true);
         }

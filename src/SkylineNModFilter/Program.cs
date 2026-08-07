@@ -14,7 +14,7 @@ namespace SkylineNModFilter
             try
             {
                 var options = ToolArguments.Parse(args);
-                var destination = OutputPath.Derive(options.DocumentPath);
+                var destination = OutputPath.Derive(options.DocumentPath, options.MissingnessOnly);
                 var replace = false;
                 if (File.Exists(destination))
                 {
@@ -22,7 +22,7 @@ namespace SkylineNModFilter
                     if (!replace) return 0;
                 }
                 var command = string.IsNullOrWhiteSpace(options.SkylineCommand) ? FindSkylineCommand() : options.SkylineCommand;
-                var workflow = new FilterWorkflow(new SkylineDocument(command, SkylineDocument.RunProcess), File.Exists, options.AssociationOptions, options.ReplicateOrderingOptions);
+                var workflow = new FilterWorkflow(new SkylineDocument(command, SkylineDocument.RunProcess), File.Exists, options.AssociationOptions, options.ReplicateOrderingOptions, options.PrecursorMissingnessOptions, options.MissingnessOnly, options.ReplicateAnnotationOptions);
                 var result = workflow.Run(options.DocumentPath, replace);
                 MessageBox.Show(CompletionMessage.Build(result), "N-Mod Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return 0;
