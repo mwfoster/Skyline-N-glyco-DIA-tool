@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 
 namespace SkylineNModFilter
 {
@@ -14,11 +15,22 @@ namespace SkylineNModFilter
 
     internal sealed class ReplicateManifest
     {
+        private static readonly Regex ExistingOrderPrefix = new Regex(@"^\d+_", RegexOptions.CultureInvariant);
+
         private ReplicateManifest(IList<ReplicateManifestEntry> entries, int duplicates, int ignored)
-        { Entries = entries; DuplicateCount = duplicates; IgnoredRowCount = ignored; }
+        { Entries = entries; DuplicateCount = duplicates; IgnoredRowCount = ignored; NumberWidth = Math.Max(3, entries.Count.ToString().Length); }
         public IList<ReplicateManifestEntry> Entries { get; private set; }
         public int DuplicateCount { get; private set; }
         public int IgnoredRowCount { get; private set; }
+        public int NumberWidth { get; private set; }
+
+        public string CreateNumberedName(ReplicateManifestEntry entry, string originalName)
+        {
+            if (entry == null) throw new ArgumentNullException("entry");
+            var selected = string.IsNullOrWhiteSpace(entry.ProposedName) ? originalName ?? string.Empty : entry.ProposedName.Trim();
+            selected = ExistingOrderPrefix.Replace(selected, string.Empty);
+            return (entry.Order + 1).ToString("D" + NumberWidth) + "_" + selected;
+        }
 
         public static ReplicateManifest Load(ReplicateOrderingOptions options)
         {
@@ -49,7 +61,9 @@ namespace SkylineNModFilter
             var cleaned = Clean(value).Replace('\\', '/');
             var slash = cleaned.LastIndexOf('/');
             if (slash >= 0) cleaned = cleaned.Substring(slash + 1);
-            if (cleaned.EndsWith(".raw", StringComparison.OrdinalIgnoreCase)) cleaned = cleaned.Substring(0, cleaned.Length - 4);
+            foreach (var extension in new[] { ".raw", ".mzml" })
+                if (cleaned.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+                    return cleaned.Substring(0, cleaned.Length - extension.Length).Trim();
             return cleaned.Trim();
         }
 

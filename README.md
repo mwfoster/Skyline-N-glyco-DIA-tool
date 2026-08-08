@@ -12,7 +12,7 @@ Skyline N-Mod Filter is a Windows External Tool for Skyline-daily. It creates a 
 
 ## Installation
 
-1. Download `SkylineNModFilter-1.6.0.zip` from the repository's `releases` folder.
+1. Download `SkylineNModFilter-1.6.1.zip` from the repository's `releases` folder.
 2. Completely close Skyline-daily.
 3. Reopen Skyline-daily and choose **Tools > External Tools**.
 4. Remove an older **N-Mod Filter** entry if present.
@@ -27,7 +27,7 @@ Skyline N-Mod Filter is a Windows External Tool for Skyline-daily. It creates a 
 - Saves a separate `<original>_N-mod-filtered.sky` document and publishes its Skyline companion files under the matching basename.
 - Sets Skyline's modification display to three-letter codes.
 - Optionally associates peptides with proteins from an installed background proteome.
-- Optionally reorders results replicates from the row order of a FragPipe manifest, TSV, or CSV metadata file.
+- Optionally prefixes matched replicate names with their FragPipe manifest, TSV, or CSV row order for safe manual ordering.
 - Optionally treats the first nonblank metadata row as a header and uses its labels for rename-column selection.
 - Optionally renames matched replicates from a selected metadata column while preserving raw-file and acquisition metadata.
 - Optionally imports every metadata column after the filename key as a Skyline replicate annotation.
@@ -42,17 +42,19 @@ Protein association is optional. When enabled, choose an installed background pr
 
 Association creates protein groups for proteins matching the same peptides and assigns shared peptides using Skyline's `AssignedToBestProtein` policy.
 
-## Replicate ordering and renaming
+## Replicate numbering and manual ordering
 
-Enable **Reorder replicates from metadata file** in the tool dialog and select a `.fp-manifest`, `.tsv`, or `.csv` file. Column 1 is matched case-insensitively to the original Skyline replicate name after removing directories and a terminal `.raw`. Matched replicates follow file row order; Skyline replicates absent from the file remain last in their existing order.
+Enable **Number matched replicates for manual ordering** in the tool dialog and select a `.fp-manifest`, `.tsv`, or `.csv` file. Column 1 is matched case-insensitively to each Skyline replicate's raw-file identity after removing directories and a terminal `.raw` or `.mzML`.
 
-Enable **File contains header row** when appropriate. To rename, enable **Rename matched replicates** and select a column of 2 or greater. Blank rename values keep the original name. Duplicate final names stop processing before the output is published.
+Enable **File contains header row** when appropriate. Enable **Use selected column after number prefix** and select a column of 2 or greater. Matched names become `001_<selected value>`, `002_<selected value>`, and so on in metadata row order. A blank selected value uses the original replicate name. Running the tool again replaces an existing leading numeric prefix instead of stacking prefixes. Skyline replicates absent from the metadata remain unchanged.
+
+The tool deliberately preserves Skyline's existing results order and does not move `<replicate>` elements or reorder `.skyd` cache data. After opening the output document, use **Edit > Manage Results** to move replicates into the displayed numeric order. The legacy command-line flag `--reorder-replicates` is retained for installed-tool compatibility, but now performs safe numbered renaming only.
 
 ## Replicate annotations and volcano plots
 
 Enable **Import all metadata columns as replicate annotations** to make metadata available in Skyline's Document Grid and Group Comparisons. A header row is required. Column 1 is the filename key; every nonblank, uniquely named column from column 2 onward becomes a text annotation that applies to replicates. Existing annotation definitions are preserved when they already apply to replicates. An existing definition with the same name that does not apply to replicates stops processing safely.
 
-Matching is case-insensitive and removes directories and a terminal `.raw`. When ordering and renaming are enabled in the same run, annotation values are still matched from the original raw-file identity and written to the final replicate name. Skyline replicates missing from the metadata remain unannotated, and metadata rows missing from Skyline are reported. If one Skyline replicate contains multiple raw files, identical metadata values are accepted; conflicting values stop processing with an explanatory error.
+Matching is case-insensitive and removes directories and a terminal `.raw` or `.mzML`. When numbering and renaming are enabled in the same run, annotation values are still matched from the original raw-file identity and written to the final replicate name. Skyline replicates missing from the metadata remain unannotated, and metadata rows missing from Skyline are reported. If one Skyline replicate contains multiple raw files, identical metadata values are accepted; conflicting values stop processing with an explanatory error.
 
 After opening the output document, use **Settings > Document Settings > Annotations** to confirm the imported fields. A categorical annotation such as `Condition` can then be selected in Skyline's **Group Comparisons** to create a comparison and display Skyline's built-in volcano plot; MSstats is not required for that plot.
 

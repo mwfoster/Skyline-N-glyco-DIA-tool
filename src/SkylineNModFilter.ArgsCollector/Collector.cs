@@ -102,10 +102,10 @@ namespace SkylineNModFilter.ArgsCollector
             _associate.Checked = oldArguments != null && oldArguments.Contains("--associate-proteins");
             _associate.Enabled = choices.Count > 0; _proteomes.Enabled = _associate.Checked && choices.Count > 0; _associate.CheckedChanged += delegate { _proteomes.Enabled = _associate.Checked; };
 
-            _reorder.SetBounds(16, 112, 320, 24); _reorder.Text = "Use metadata file to reorder replicates";
+            _reorder.SetBounds(16, 112, 400, 24); _reorder.Text = global::SkylineNModFilter.ReplicateNamingText.EnableLabel;
             _manifest.SetBounds(35, 142, 455, 24); _browse.SetBounds(500, 140, 75, 26); _browse.Text = "Browse...";
             _header.SetBounds(35, 174, 200, 24); _header.Text = "File contains header row";
-            _rename.SetBounds(35, 204, 200, 24); _rename.Text = "Rename matched replicates";
+            _rename.SetBounds(35, 204, 310, 24); _rename.Text = global::SkylineNModFilter.ReplicateNamingText.RenameLabel;
             var columnLabel = new Label { Left = 55, Top = 238, Width = 90, Text = "Name column:" };
             _nameColumns.SetBounds(145, 234, 430, 26); _nameColumns.DropDownStyle = ComboBoxStyle.DropDownList;
             _reorder.Checked = Has(oldArguments, "--reorder-replicates"); _manifest.Text = ValueAfter(oldArguments, "--replicate-manifest") ?? string.Empty;

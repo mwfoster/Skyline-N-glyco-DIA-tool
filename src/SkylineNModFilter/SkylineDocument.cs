@@ -130,16 +130,21 @@ namespace SkylineNModFilter
         {
             if (manifest == null) throw new ArgumentNullException("manifest");
             var measuredResults = _xml.Descendants().FirstOrDefault(e => e.Name.LocalName == "measured_results");
-            if (measuredResults == null) throw new InvalidDataException("The Skyline document has no measured results to reorder.");
+            if (measuredResults == null) throw new InvalidDataException("The Skyline document has no measured results to rename.");
             var replicates = measuredResults.Elements().Where(e => e.Name.LocalName == "replicate").ToList();
-            if (replicates.Count == 0) throw new InvalidDataException("The Skyline document has no results replicates to reorder.");
+            if (replicates.Count == 0) throw new InvalidDataException("The Skyline document has no results replicates to rename.");
 
-            var byName = new Dictionary<string, XElement>(StringComparer.OrdinalIgnoreCase);
+            var byIdentity = new Dictionary<string, XElement>(StringComparer.OrdinalIgnoreCase);
             foreach (var replicate in replicates)
             {
                 var name = (string)replicate.Attribute("name");
-                if (string.IsNullOrWhiteSpace(name) || byName.ContainsKey(name)) throw new InvalidDataException("Skyline replicate names must be nonblank and unique before ordering.");
-                byName.Add(name, replicate);
+                if (string.IsNullOrWhiteSpace(name)) throw new InvalidDataException("Skyline replicate names must be nonblank before renaming.");
+                var sampleFile = replicate.Elements().FirstOrDefault(e => e.Name.LocalName == "sample_file");
+                var filePath = sampleFile == null ? null : (string)sampleFile.Attribute("file_path");
+                var identity = ReplicateManifest.NormalizeKey(string.IsNullOrWhiteSpace(filePath) ? name : filePath);
+                if (string.IsNullOrWhiteSpace(identity) || byIdentity.ContainsKey(identity))
+                    throw new InvalidDataException("Skyline replicate raw-file identities must be nonblank and unique before renaming: " + identity);
+                byIdentity.Add(identity, replicate);
             }
 
             var matchedElements = new List<XElement>();
@@ -148,7 +153,7 @@ namespace SkylineNModFilter
             foreach (var entry in manifest.Entries)
             {
                 XElement replicate;
-                if (!byName.TryGetValue(entry.Key, out replicate)) { absentManifest++; continue; }
+                if (!byIdentity.TryGetValue(entry.Key, out replicate)) { absentManifest++; continue; }
                 matchedElements.Add(replicate);
                 entryByElement.Add(replicate, entry);
             }
@@ -161,8 +166,8 @@ namespace SkylineNModFilter
             {
                 var original = (string)replicate.Attribute("name");
                 ReplicateManifestEntry entry;
-                var finalName = entryByElement.TryGetValue(replicate, out entry) && !string.IsNullOrWhiteSpace(entry.ProposedName) ? entry.ProposedName : original;
-                if (string.IsNullOrWhiteSpace(finalName) || !uniqueFinalNames.Add(finalName)) throw new InvalidDataException("Replicate renaming would create a duplicate or blank final name: " + finalName);
+                var finalName = entryByElement.TryGetValue(replicate, out entry) ? manifest.CreateNumberedName(entry, original) : original;
+                if (string.IsNullOrWhiteSpace(finalName) || !uniqueFinalNames.Add(finalName)) throw new InvalidDataException("Numbered replicate renaming would create a duplicate or blank final name: " + finalName);
                 finalNames.Add(replicate, finalName);
             }
 
@@ -173,11 +178,6 @@ namespace SkylineNModFilter
                 string replacement;
                 if (renameMap.TryGetValue(attribute.Value, out replacement)) attribute.Value = replacement;
             }
-
-            var matchedSet = new HashSet<XElement>(matchedElements);
-            var reordered = matchedElements.Concat(replicates.Where(e => !matchedSet.Contains(e))).ToList();
-            foreach (var replicate in replicates) replicate.Remove();
-            measuredResults.Add(reordered);
 
             var renamed = entryByElement.Keys.Count(e => !string.Equals(originalNames[e], finalNames[e], StringComparison.Ordinal));
             return new ReplicateOrderResult

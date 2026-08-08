@@ -9,27 +9,44 @@ namespace SkylineNModFilter.Tests
     {
         public static void Run()
         {
-            ReordersAndRenamesAllReferencesAtomically();
+            NumbersNamesWithoutChangingReplicateOrder();
+            ReplacesExistingNumberPrefixOnRerun();
             RejectsNameCollisionWithoutMutation();
         }
 
-        private static void ReordersAndRenamesAllReferencesAtomically()
+        private static void NumbersNamesWithoutChangingReplicateOrder()
         {
             string root, working;
             var document = CreateDocument(out root, out working);
-            var manifest = CreateManifest(root, "Path,Name\r\nA.raw,B\r\nB.raw,A\r\nDDA.raw,D\r\n");
+            var manifest = CreateManifest(root, "Path,Name\r\nA.raw,Control A\r\nB.mzML,Control B\r\nDDA.raw,D\r\n");
             var result = document.ApplyReplicateOrdering(manifest);
             document.SaveXmlForTest();
             var xml = XDocument.Load(working);
             var names = xml.Descendants("measured_results").Elements("replicate").Select(e => (string)e.Attribute("name")).ToArray();
-            TestAssert.Equal("B,A,Extra", string.Join(",", names), "Matched replicates must follow manifest order and unmatched must remain last.");
+            TestAssert.Equal("002_Control B,001_Control A,001_Extra", string.Join(",", names), "Renaming must preserve Skyline replicate element order.");
+            var paths = xml.Descendants("measured_results").Elements("replicate").Select(e => (string)e.Element("sample_file").Attribute("file_path")).ToArray();
+            TestAssert.Equal("B.mzML,A.raw,Extra.raw", string.Join(",", paths), "Raw-file identities must remain attached to their original replicate positions.");
             var references = xml.Descendants().Attributes("replicate").Select(a => a.Value).ToArray();
-            TestAssert.Equal("B,A", string.Join(",", references), "All result references must use the swapped names exactly once.");
-            TestAssert.Equal("raw-A", (string)xml.Descendants("sample_file").First().Attribute("sample_name"), "Sample metadata must not be renamed.");
+            TestAssert.Equal("001_Control A,002_Control B", string.Join(",", references), "All result references must use numbered names exactly once.");
+            TestAssert.Equal("raw-B", (string)xml.Descendants("sample_file").First().Attribute("sample_name"), "Sample metadata must remain attached to the first original replicate.");
             TestAssert.Equal(2, result.Matched, "Matched count should report Skyline matches.");
             TestAssert.Equal(1, result.IgnoredManifest, "Absent manifest entries should be ignored.");
             TestAssert.Equal(1, result.UnmatchedSkyline, "Unmatched Skyline replicate should be reported.");
             TestAssert.Equal(2, result.Renamed, "Both matched replicates should be renamed.");
+            Directory.Delete(root, true);
+        }
+
+        private static void ReplacesExistingNumberPrefixOnRerun()
+        {
+            string root, working;
+            var document = CreateDocument(out root, out working);
+            var manifest = CreateManifest(root, "Path,Name\r\nA.raw,009_Control A\r\n");
+            document.ApplyReplicateOrdering(manifest);
+            document.ApplyReplicateOrdering(manifest);
+            document.SaveXmlForTest();
+            var name = XDocument.Load(working).Descendants("measured_results").Elements("replicate")
+                .First(e => ((string)e.Element("sample_file").Attribute("file_path")) == "A.raw").Attribute("name").Value;
+            TestAssert.Equal("001_Control A", name, "Rerunning should replace, not stack, numeric prefixes.");
             Directory.Delete(root, true);
         }
 
@@ -60,9 +77,9 @@ namespace SkylineNModFilter.Tests
             working = Path.Combine(root, "working.sky");
             new XDocument(new XElement("srm_settings",
                 new XElement("measured_results",
-                    new XElement("replicate", new XAttribute("name", "B"), new XElement("sample_file", new XAttribute("sample_name", "raw-B"), new XAttribute("file_path", "B.raw"))),
+                    new XElement("replicate", new XAttribute("name", "B"), new XElement("sample_file", new XAttribute("sample_name", "raw-B"), new XAttribute("file_path", "B.mzML"))),
                     new XElement("replicate", new XAttribute("name", "A"), new XElement("sample_file", new XAttribute("sample_name", "raw-A"), new XAttribute("file_path", "A.raw"))),
-                    new XElement("replicate", new XAttribute("name", "Extra"), new XElement("sample_file", new XAttribute("sample_name", "raw-Extra"), new XAttribute("file_path", "Extra.raw")))),
+                    new XElement("replicate", new XAttribute("name", "001_Extra"), new XElement("sample_file", new XAttribute("sample_name", "raw-Extra"), new XAttribute("file_path", "Extra.raw")))),
                 new XElement("peptide",
                     new XElement("precursor_peak", new XAttribute("replicate", "A"), new XAttribute("area", "10")),
                     new XElement("transition_peak", new XAttribute("replicate", "B"), new XAttribute("area", "20"))))).Save(source);
